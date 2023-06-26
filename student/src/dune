@@ -3,4 +3,4 @@
  (inline_tests)
  (preprocess
   (pps ppx_jane))
- (libraries tic_tac_toe_2023_common))
+ (libraries tic_tac_toe_2023_common tic_tac_toe_exercises_lib))
