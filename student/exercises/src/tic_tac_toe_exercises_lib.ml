@@ -91,12 +91,55 @@ let available_moves
 
    After you are done with this implementation, you can uncomment out
    "evaluate" test cases found below in this file. *)
+
+let position_list_down ~(game_kind: Game_kind.t) ~(position: Position.t) = 
+   let rec populate_list ~(last_val: Position.t) n ~(list: Position.t list) =
+    if (n = 0) then 
+      (list)
+    else (
+      let new_pos = Position.down last_val in 
+      let list = list @ [new_pos] in 
+      populate_list ~last_val: new_pos (n-1) ~list: list
+    )
+  in  
+  let l = [position] in 
+  populate_list ~last_val: position (Game_kind.win_length game_kind) ~list: l
+   
+;;
+let position_list_diag_right ~(game_kind: Game_kind.t) ~(position: Position.t) = 
+  let rec populate_list ~(last_val: Position.t) n ~(list: Position.t list) =
+   if (n = 0) then 
+     (list)
+   else (
+     let new_pos = Position.right (Position.down last_val) in 
+     let list = list @ [new_pos] in 
+     populate_list ~last_val: new_pos (n-1) ~list: list
+   )
+ in  
+ let l = [position] in 
+ populate_list ~last_val: position (Game_kind.win_length game_kind) ~list: l
+;;
+
+
+
+let position_list_left ~(game_kind: Game_kind.t) ~(position: Position.t) = 
+  let rec populate_list ~(last_val: Position.t) n ~(list: Position.t list) =
+   if (n = 0) then 
+     (list)
+   else (
+     let new_pos = Position.left last_val in 
+     let list = list @ [new_pos] in 
+     populate_list ~last_val: new_pos (n-1) ~list: list
+   )
+ in  
+ let l = [position] in 
+ populate_list ~last_val: position (Game_kind.win_length game_kind) ~list: l
+  
+;;
 let evaluate ~(game_kind : Game_kind.t) ~(pieces : Piece.t Position.Map.t)
   : Evaluation.t
   =
-  ignore pieces;
-  ignore game_kind;
-  failwith "Implement me!"
+
 ;;
 
 (* Exercise 3. *)
