@@ -92,7 +92,7 @@ let available_moves
    After you are done with this implementation, you can uncomment out
    "evaluate" test cases found below in this file. *)
 
-let position_list_down ~(game_kind: Game_kind.t) ~(position: Position.t) = 
+(*let position_list_down ~(game_kind: Game_kind.t) ~(position: Position.t) = 
    let rec populate_list ~(last_val: Position.t) n ~(list: Position.t list) =
     if (n = 0) then 
       (list)
@@ -136,9 +136,30 @@ let position_list_left ~(game_kind: Game_kind.t) ~(position: Position.t) =
  populate_list ~last_val: position (Game_kind.win_length game_kind) ~list: l
   
 ;;
+*)
 let evaluate ~(game_kind : Game_kind.t) ~(pieces : Piece.t Position.Map.t)
   : Evaluation.t
   =
+  let rec check_for_win ~(n: int) ~(pos: Position.t) ~(piece_type: Piece.t) 
+  ~(direction: int)= 
+    if (n = Game_kind.win_length game_kind) then
+      true
+    else (
+      let p = 
+      (match direction with
+      | 1 -> Map.find pieces (Position.down pos) 
+      | 2 -> Map.find pieces (Position.right pos)
+      | 3 -> Map.find pieces (Position.down (Position.right pos)) 
+      | 4 -> Map.find pieces (Position.up (Position.right pos))
+      | _ -> None 
+      ) in 
+      match p with
+      | None -> false
+      | Some p -> (if(Piece.equal p piece_type) 
+        then (check_for_win ~n:(n+1) ~pos: p ~piece_type: piece_type ~direction: direction) 
+        else false)
+    )
+  
 
 ;;
 
