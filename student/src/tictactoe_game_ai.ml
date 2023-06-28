@@ -91,7 +91,16 @@ let _ = score
 let compute_next_move ~(me : Piece.t) ~(game_state : Game_state.t)
   : Position.t
   =
-  let p = game_state.pieces in
-  let kind = game_state.game_kind in
-  random_move_strategy ~game_kind:kind ~pieces:p
+  let winning_positions =
+    winning_moves
+      ~me
+      ~game_kind:game_state.game_kind
+      ~pieces:game_state.pieces
+  in
+  match winning_positions with
+  | [] ->
+    random_move_strategy
+      ~game_kind:game_state.game_kind
+      ~pieces:game_state.pieces
+  | head :: _body -> head
 ;;

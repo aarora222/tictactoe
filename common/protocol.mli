@@ -130,6 +130,9 @@ module Position : sig
   (** [left t] is [t]'s leftwards neighbor. *)
   val left : t -> t
 
+  val up_right : t -> t
+  val down_right : t -> t
+
   (** [all_offsets] is a list of functions to compute all 8 neighbors of a
       cell (i.e. left, up-left, up, up-right, right, right-down, down,
       down-left). *)

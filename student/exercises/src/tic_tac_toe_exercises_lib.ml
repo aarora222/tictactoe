@@ -85,82 +85,52 @@ let available_moves
   List.filter all_positions ~f:not_in_taken
 ;;
 
-(* Exercise 2.
-
-   For instructions on implemeting this refer to the README.
-
-   After you are done with this implementation, you can uncomment out
-   "evaluate" test cases found below in this file. *)
-
-(*let position_list_down ~(game_kind: Game_kind.t) ~(position: Position.t) = 
-   let rec populate_list ~(last_val: Position.t) n ~(list: Position.t list) =
-    if (n = 0) then 
-      (list)
+let eval_position
+  (pieces : Piece.t Position.Map.t)
+  (game_kind : Game_kind.t)
+  (pos : Position.t)
+  (piece : Piece.t)
+  : bool
+  =
+  let rec eval_line
+    (left_to_win : int)
+    (dir : Position.t -> Position.t)
+    (old_pos : Position.t)
+    (piece : Piece.t)
+    (pieces : Piece.t Position.Map.t)
+    (game_kind : Game_kind.t)
+    : bool
+    =
+    let pos = dir old_pos in
+    if left_to_win = 0
+    then true
     else (
-      let new_pos = Position.down last_val in 
-      let list = list @ [new_pos] in 
-      populate_list ~last_val: new_pos (n-1) ~list: list
-    )
-  in  
-  let l = [position] in 
-  populate_list ~last_val: position (Game_kind.win_length game_kind) ~list: l
-   
-;;
-let position_list_diag_right ~(game_kind: Game_kind.t) ~(position: Position.t) = 
-  let rec populate_list ~(last_val: Position.t) n ~(list: Position.t list) =
-   if (n = 0) then 
-     (list)
-   else (
-     let new_pos = Position.right (Position.down last_val) in 
-     let list = list @ [new_pos] in 
-     populate_list ~last_val: new_pos (n-1) ~list: list
-   )
- in  
- let l = [position] in 
- populate_list ~last_val: position (Game_kind.win_length game_kind) ~list: l
+      match Map.find pieces pos with
+      | Some new_piece ->
+        if Piece.equal new_piece piece
+        then eval_line (left_to_win - 1) dir pos piece pieces game_kind
+        else false
+      | None -> false)
+  in
+  let checks = Position.all_offsets in
+  let win_length_from_pos = Game_kind.win_length game_kind - 1 in
+  let check_line_with_dir dir : bool =
+    eval_line win_length_from_pos dir pos piece pieces game_kind
+  in
+  List.exists checks ~f:check_line_with_dir
 ;;
 
-
-
-let position_list_left ~(game_kind: Game_kind.t) ~(position: Position.t) = 
-  let rec populate_list ~(last_val: Position.t) n ~(list: Position.t list) =
-   if (n = 0) then 
-     (list)
-   else (
-     let new_pos = Position.left last_val in 
-     let list = list @ [new_pos] in 
-     populate_list ~last_val: new_pos (n-1) ~list: list
-   )
- in  
- let l = [position] in 
- populate_list ~last_val: position (Game_kind.win_length game_kind) ~list: l
-  
-;;
-*)
 let evaluate ~(game_kind : Game_kind.t) ~(pieces : Piece.t Position.Map.t)
   : Evaluation.t
   =
-  let rec check_for_win ~(n: int) ~(pos: Position.t) ~(piece_type: Piece.t) 
-  ~(direction: int)= 
-    if (n = Game_kind.win_length game_kind) then
-      true
-    else (
-      let p = 
-      (match direction with
-      | 1 -> Map.find pieces (Position.down pos) 
-      | 2 -> Map.find pieces (Position.right pos)
-      | 3 -> Map.find pieces (Position.down (Position.right pos)) 
-      | 4 -> Map.find pieces (Position.up (Position.right pos))
-      | _ -> None 
-      ) in 
-      match p with
-      | None -> false
-      | Some p -> (if(Piece.equal p piece_type) 
-        then (check_for_win ~n:(n+1) ~pos: p ~piece_type: piece_type ~direction: direction) 
-        else false)
-    )
-  
-
+  let check_cell_wrapper pos : bool =
+    match Map.find pieces pos with
+    | Some piece -> eval_position pieces game_kind pos piece
+    | None -> false
+  in
+  match List.find (get_all_positions ~game_kind) ~f:check_cell_wrapper with
+  | Some pos -> Game_over { winner = Some (Map.find_exn pieces pos) }
+  | None -> Game_continues
 ;;
 
 (* Exercise 3. *)
@@ -170,10 +140,25 @@ let winning_moves
   ~(pieces : Piece.t Position.Map.t)
   : Position.t list
   =
-  ignore me;
-  ignore game_kind;
-  ignore pieces;
-  failwith "Implement me!"
+  let remaining_pos = available_moves ~game_kind ~pieces in
+  let rec check_winning_moves
+    ~(avail_positions : Position.t list)
+    ~(win_list : Position.t list)
+    =
+    match avail_positions with
+    | [] -> win_list
+    | head :: body ->
+      let new_map = Map.set pieces ~key:head ~data:me in
+      let winning_move = evaluate ~game_kind ~pieces:new_map in
+      let list =
+        match winning_move with
+        | Evaluation.Game_over { winner = Some winner } ->
+          if Piece.equal winner me then win_list @ [ head ] else win_list
+        | _ -> win_list
+      in
+      check_winning_moves ~avail_positions:body ~win_list:list
+  in
+  check_winning_moves ~avail_positions:remaining_pos ~win_list:[]
 ;;
 
 (* Exercise 4. *)
@@ -183,10 +168,17 @@ let losing_moves
   ~(pieces : Piece.t Position.Map.t)
   : Position.t list
   =
-  ignore me;
-  ignore game_kind;
-  ignore pieces;
-  failwith "Implement me!"
+  let opponent_win_moves =
+    winning_moves ~me:(Piece.flip me) ~game_kind ~pieces
+  in
+  let av_moves = available_moves ~game_kind ~pieces in
+  let not_in_win_moves p =
+    let bool = List.mem opponent_win_moves p ~equal:Position.equal in
+    match bool with true -> false | false -> true
+  in
+  match opponent_win_moves with
+  | [] -> []
+  | _head :: _body -> List.filter av_moves ~f:not_in_win_moves
 ;;
 
 let exercise_one =
@@ -309,29 +301,62 @@ let%expect_test "no available_moves" =
 
 (* When you've implemented the [evaluate] function, uncomment the next two
    tests! *)
-(* let%expect_test "evalulate_win_for_x" = print_endline (evaluate
-   ~game_kind:win_for_x.game_kind ~pieces:win_for_x.pieces |>
-   Evaluation.to_string); [%expect {| (Win (X)) |}] ;;
+let%expect_test "evalulate_win_for_x" =
+  print_endline
+    (evaluate ~game_kind:win_for_x.game_kind ~pieces:win_for_x.pieces
+     |> Evaluation.to_string);
+  [%expect {| (Win (X)) |}]
+;;
 
-   let%expect_test "evalulate_non_win" = print_endline (evaluate
-   ~game_kind:non_win.game_kind ~pieces:non_win.pieces |>
-   Evaluation.to_string); [%expect {| Game_continues |}] ;; *)
+let%expect_test "evalulate_non_win" =
+  print_endline
+    (evaluate ~game_kind:non_win.game_kind ~pieces:non_win.pieces
+     |> Evaluation.to_string);
+  [%expect {| Game_continues |}]
+;;
 
 (* When you've implemented the [winning_moves] function, uncomment this
    test! *)
-(*let%expect_test "winning_move" = let positions = winning_moves
-  ~game_kind:non_win.game_kind ~pieces:non_win.pieces ~me:Piece.X in print_s
-  [%sexp (positions : Position.t list)]; [%expect {| ((((row 1) (column 1))))
-  |}]; let positions = winning_moves ~game_kind:non_win.game_kind
-  ~pieces:non_win.pieces ~me:Piece.O in print_s [%sexp (positions :
-  Position.t list)]; [%expect {| () |}] ;;*)
+let%expect_test "winning_move" =
+  let positions =
+    winning_moves
+      ~game_kind:non_win.game_kind
+      ~pieces:non_win.pieces
+      ~me:Piece.X
+  in
+  print_s [%sexp (positions : Position.t list)];
+  [%expect {| ((((row 1) (column 1))))
+  |}];
+  let positions =
+    winning_moves
+      ~game_kind:non_win.game_kind
+      ~pieces:non_win.pieces
+      ~me:Piece.O
+  in
+  print_s [%sexp (positions : Position.t list)];
+  [%expect {| () |}]
+;;
 
 (* When you've implemented the [losing_moves] function, uncomment this
    test! *)
-(*let%expect_test "print_losing" = let positions = losing_moves
-  ~game_kind:non_win.game_kind ~pieces:non_win.pieces ~me:Piece.X in print_s
-  [%sexp (positions : Position.t list)]; [%expect {| () |}]; let positions =
-  losing_moves ~game_kind:non_win.game_kind ~pieces:non_win.pieces
-  ~me:Piece.O in print_s [%sexp (positions : Position.t list)]; [%expect {|
+let%expect_test "print_losing" =
+  let positions =
+    losing_moves
+      ~game_kind:non_win.game_kind
+      ~pieces:non_win.pieces
+      ~me:Piece.X
+  in
+  print_s [%sexp (positions : Position.t list)];
+  [%expect {| () |}];
+  let positions =
+    losing_moves
+      ~game_kind:non_win.game_kind
+      ~pieces:non_win.pieces
+      ~me:Piece.O
+  in
+  print_s [%sexp (positions : Position.t list)];
+  [%expect
+    {|
   ((((row 0) (column 1)) ((row 0) (column 2)) ((row 1) (column 2)) ((row 2)
-  (column 1)))) |}] ;;*)
+  (column 1)))) |}]
+;;
