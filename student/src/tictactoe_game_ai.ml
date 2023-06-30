@@ -100,32 +100,95 @@ let max a b =
   if com > 0 then a else b
 ;;
 
-let rec score
+let min a b =
+  let com = Float.compare a b in
+  if com < 0 then a else b
+;;
+
+let score
   ~(me : Piece.t)
+  ~(game_kind : Game_kind.t)
+  ~(pieces : Piece.t Position.Map.t)
+  =
+  let _my_win_moves = winning_moves ~me ~game_kind ~pieces in
+  let _opp_win_moves =
+    winning_moves ~me:(Piece.flip me) ~game_kind ~pieces
+  in
+  (*let rec get_score ~(score : float) ~(moves : Position.t list) = match
+    moves with | [] -> score | _head :: body -> let new_score = Float.add
+    score 100.0 in get_score ~score:new_score ~moves:body in*)
+  let state = evaluate ~game_kind ~pieces in
+  match state with
+  | Game_over { winner = Some winner } ->
+    if Piece.equal winner me then Float.infinity else Float.neg_infinity
+  | _ -> 0.0
+;;
+
+(*let my_score = get_score ~score:0.0 ~moves:my_win_moves in let opp_score =
+  get_score ~score:0.0 ~moves:opp_win_moves in Float.sub my_score
+  opp_score *)
+
+let _ = score
+
+let rec minimax
+  ~(me : Piece.t)
+  ~(maximizing_player : bool)
+  ~(depth : int)
   ~(game_kind : Game_kind.t)
   ~(pieces : Piece.t Position.Map.t)
   : float
   =
-  let game_state = evaluate ~game_kind ~pieces in
-  match game_state with
-  | Evaluation.Game_over { winner = Some winner } ->
-    if Piece.equal winner me then 1.0 else -1.0
-  | Evaluation.Game_over { winner = None } -> 0.0
-  | _ ->
-    let value = Float.min_value in
-    let all_pos_actions = all_actions ~me ~game_kind ~pieces in
-    let rec v ~(return_val : float) ~(actions : Piece.t Position.Map.t list) =
-      match actions with
-      | [] -> return_val
-      | head :: body ->
-        let mmax = score ~me ~game_kind ~pieces:head in
-        let mav_val = max mmax return_val in
-        v ~return_val:mav_val ~actions:body
-    in
-    v ~return_val:value ~actions:all_pos_actions
+  let avl_moves = available_moves ~game_kind ~pieces in
+  let state_of_game = evaluate ~game_kind ~pieces in
+  let game_ended =
+    match state_of_game with
+    | Evaluation.Game_over { winner = _ } -> true
+    | _ -> false
+  in
+  let game_ended_or_mdepth = game_ended || depth = 0 in
+  match game_ended_or_mdepth with
+  | true -> score ~me ~game_kind ~pieces
+  | false ->
+    if maximizing_player
+    then (
+      let value = Float.neg_infinity in
+      let rec get_max ~(avl_moves : Position.t list) ~(return_val : float) =
+        match avl_moves with
+        | [] -> return_val
+        | head :: body ->
+          let new_map = Map.set pieces ~key:head ~data:me in
+          let comp_val =
+            minimax
+              ~me
+              ~maximizing_player:false
+              ~depth:(depth - 1)
+              ~game_kind
+              ~pieces:new_map
+          in
+          let m_val = max return_val comp_val in
+          get_max ~avl_moves:body ~return_val:m_val
+      in
+      get_max ~avl_moves ~return_val:value)
+    else (
+      let value = Float.infinity in
+      let rec get_min ~(avl_moves : Position.t list) ~(return_val : float) =
+        match avl_moves with
+        | [] -> return_val
+        | head :: body ->
+          let new_map = Map.set pieces ~key:head ~data:me in
+          let comp_val =
+            minimax
+              ~me
+              ~maximizing_player:true
+              ~depth:(depth - 1)
+              ~game_kind
+              ~pieces:new_map
+          in
+          let m_val = min return_val comp_val in
+          get_min ~avl_moves:body ~return_val:m_val
+      in
+      get_min ~avl_moves ~return_val:value)
 ;;
-
-let _ = score
 
 (* [compute_next_move] is your Game AI's function.
 
@@ -157,7 +220,12 @@ let compute_next_move ~(me : Piece.t) ~(game_state : Game_state.t)
     | [] -> state
     | head :: body ->
       let pot_score =
-        score ~me ~game_kind:game_state.game_kind ~pieces:head
+        minimax
+          ~me
+          ~maximizing_player:true
+          ~depth:1
+          ~game_kind:game_state.game_kind
+          ~pieces:head
       in
       let m_score = max sc pot_score in
       let best_state = if Float.equal m_score sc then state else head in
